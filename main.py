@@ -6,52 +6,56 @@ from typing import List
 import numpy as np
 import openai
 
-# Hardcoded OpenAI API Key (insert your key below)
+# ✅ HARD-CODED OpenAI API Key (for testing only)
 openai.api_key = "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"
 
+# Initialize FastAPI app
 app = FastAPI()
 
-# Enable CORS for all origins and allow OPTIONS and POST methods
+# ✅ Enable CORS for all origins and headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["OPTIONS", "POST"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ✅ Request payload model
 class SearchRequest(BaseModel):
     docs: List[str]
     query: str
 
-def embed_texts(texts: List[str]) -> List[List[float]]:
+# ✅ Call OpenAI Embedding API
+def get_embeddings(texts: List[str]) -> List[List[float]]:
     response = openai.embeddings.create(
         model="text-embedding-3-small",
         input=texts
     )
-    return [item["embedding"] for item in response["data"]]
+    return [record["embedding"] for record in response.data]
 
+# ✅ Cosine similarity
 def cosine_similarity(vec1, vec2):
-    vec1 = np.array(vec1)
-    vec2 = np.array(vec2)
+    vec1, vec2 = np.array(vec1), np.array(vec2)
     if np.linalg.norm(vec1) == 0 or np.linalg.norm(vec2) == 0:
         return 0.0
-    return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+    return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
 
+# ✅ POST endpoint
 @app.post("/api/v1/embedding-search")
 async def embedding_search(payload: SearchRequest):
     if not payload.docs or not payload.query:
-        return {"matches": []}
+        return {"matches": [], "error": "Empty docs or query."}
 
-    # Embed documents + query
-    embeddings = embed_texts(payload.docs + [payload.query])
+    # Combine docs + query and get embeddings
+    all_texts = payload.docs + [payload.query]
+    embeddings = get_embeddings(all_texts)
+
     doc_embeddings = embeddings[:-1]
     query_embedding = embeddings[-1]
 
-    # Compute similarity scores
-    sims = [cosine_similarity(query_embedding, d) for d in doc_embeddings]
+    # Compute similarity and rank
+    similarities = [cosine_similarity(query_embedding, doc_emb) for doc_emb in doc_embeddings]
+    top_indices = sorted(range(len(similarities)), key=lambda i: similarities[i], reverse=True)[:3]
+    top_docs = [payload.docs[i] for i in top_indices]
 
-    # Get top 3 matches by similarity
-    top3_idx = np.argsort(sims)[::-1][:3]
-    matches = [payload.docs[i] for i in top3_idx]
-
-    return {"matches": matches}
+    return {"matches": top_docs}
