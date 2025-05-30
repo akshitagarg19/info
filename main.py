@@ -4,11 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import numpy as np
-import os
 import openai
 
-# Set your OpenAI API key here or export OPENAI_API_KEY in your environment
-openai.api_key = os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY")
+# Hardcoded OpenAI API Key (insert your key below)
+openai.api_key = "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"
 
 app = FastAPI()
 
